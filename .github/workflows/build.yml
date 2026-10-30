@@ -20,48 +20,50 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Find Gradle project
-        id: find_project
+      - name: Extract VoidX project
         shell: bash
         run: |
-          echo "Buscando proyecto Gradle..."
+          echo "📦 Extrayendo VoidXClient-1.21.zip..."
 
-          PROJECT_DIR=$(find . -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
-            -not -path "./.git/*" \
+          mkdir -p VoidXBuild
+          unzip -q VoidXClient-1.21.zip -d VoidXBuild
+
+          echo "📁 Contenido extraído:"
+          find VoidXBuild -maxdepth 3 -type f | sort
+
+      - name: Find Gradle project
+        id: gradle_project
+        shell: bash
+        run: |
+          PROJECT_DIR=$(find VoidXBuild -type f \
+            \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
             -printf '%h\n' | head -n 1)
 
           if [ -z "$PROJECT_DIR" ]; then
-            PROJECT_DIR=$(find . -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) \
-              -not -path "./.git/*" \
+            PROJECT_DIR=$(find VoidXBuild -type f \
+              \( -name "build.gradle" -o -name "build.gradle.kts" \) \
               -printf '%h\n' | head -n 1)
           fi
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "❌ No se encontró ningún proyecto Gradle."
-            echo "Archivos encontrados:"
-            find . -maxdepth 4 -type f | sort
+            echo "❌ No se encontró build.gradle/settings.gradle dentro del ZIP."
+            find VoidXBuild -type f | sort
             exit 1
           fi
 
-          echo "✅ Proyecto encontrado en: $PROJECT_DIR"
+          echo "✅ Proyecto encontrado:"
+          echo "$PROJECT_DIR"
+
           echo "project_dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
-      - name: Show project files
-        run: |
-          echo "📁 Proyecto:"
-          ls -la "${{ steps.find_project.outputs.project_dir }}"
-
       - name: Build VoidX
-        working-directory: ${{ steps.find_project.outputs.project_dir }}
+        working-directory: ${{ steps.gradle_project.outputs.project_dir }}
         run: |
           gradle build --no-daemon
 
-      - name: Upload JAR
+      - name: Upload VoidX JAR
         uses: actions/upload-artifact@v4
         with:
-          name: voidx-client
-          path: "**/build/libs/*.jar"
+          name: VoidX-Client
+          path: "VoidXBuild/**/build/libs/*.jar"
           if-no-files-found: error
